@@ -1,0 +1,62 @@
+version: "3"
+
+networks:
+    private_network:
+        ipam:
+            driver: default
+            config:
+                - subnet: 10.10.0.0/24
+
+services:
+    wireguard:
+        depends_on: [unbound, adguard]
+        image: linuxserver/wireguard:latest
+        container_name: wireguard
+        restart: unless-stopped
+        hostname: wireguard
+        cap_add:
+            - NET_ADMIN
+            - SYS_MODULE
+        environment:
+            - PUID=1000
+            - PGID=1000
+            - TZ=Europe/Copenhagen
+            - PEERS=1
+            - PEERDNS=10.10.0.10
+            - INTERNAL_SUBNET=10.6.0.0
+
+        volumes:
+            - "./wireguard/config:/config"
+            - "/lib/modules:/lib/modules"
+        ports:
+            - 51820:51820/udp
+        sysctls:
+            - net.ipv4.conf.all.src_valid_mark=1
+        networks:
+            private_network:
+                ipv4_address: 10.10.0.30
+    adguard:
+        depends_on: [unbound]
+        container_name: adguard
+        image: adguard/adguardhome
+        restart: unless-stopped
+        hostname: adguard
+        volumes:
+            - "./adguard/opt-adguard-work:/opt/adguardhome/work"
+            - "./adguard/opt-adguard-conf:/opt/adguardhome/conf"
+            - "./adguard/log:/opt/adguardhome/log"
+        networks:
+            private_network:
+                ipv4_address: 10.10.0.10
+
+    unbound:
+        image: mvance/unbound:latest
+        container_name: unbound
+        restart: unless-stopped
+        hostname: unbound
+        volumes:
+            - "./unbound:/opt/unbound/etc/unbound/"
+            - "./unbound/log:/unbound/dev/null"
+        networks:
+            private_network:
+                ipv4_address: 10.10.0.20
